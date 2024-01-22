@@ -79,20 +79,6 @@ impl Instance {
         }
     }
 
-    /// Select the given render target for drawing the frame.
-    ///
-    /// # Errors
-    ///
-    /// Fails if the given target cannot be used for drawing.
-    #[doc(alias = "C3D_FrameDrawOn")]
-    pub fn select_render_target(&mut self, target: &render::Target<'_>) -> Result<()> {
-        let _ = self;
-        if unsafe { citro3d_sys::C3D_FrameDrawOn(target.as_raw()) } {
-            Ok(())
-        } else {
-            Err(Error::InvalidRenderTarget)
-        }
-    }
     pub fn begin_new_frame(&mut self) -> Frame<'_> {
         Frame::new(self)
     }
@@ -248,8 +234,25 @@ impl<'g> Frame<'g> {
             self.0.bind_program(program);
         }
     }
+    /// Select the given render target for drawing the frame.
+    #[doc(alias = "C3D_FrameDrawOn")]
+    pub fn select_render_target(&mut self, target: &render::Target<'_>) {
+        if !unsafe { citro3d_sys::C3D_FrameDrawOn(target.as_raw()) } {
+            unreachable!(
+                "C3D_FrameDrawOn should only fail if not in a frame, this should be impossible"
+            );
+        }
+    }
     pub fn drawer<'s>(&'s mut self) -> Drawer<'g, 's> {
         Drawer { frame: self }
+    }
+    pub fn instance(&self) -> &Instance {
+        self.0
+    }
+
+    /// Access the gpu instance used for drawing the frame
+    pub fn instance_mut(&mut self) -> &mut Instance {
+        self.0
     }
 }
 impl<'g> Drop for Frame<'g> {
