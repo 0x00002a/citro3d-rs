@@ -248,6 +248,16 @@ impl<'g> Frame<'g> {
         Self(inst)
     }
     /// Use the given [`shader::Program`] for subsequent draw calls.
+    ///
+    /// This manages the lifetime of `program` to ensure the binding is
+    /// safe
+    ///
+    /// ```compile_fail
+    /// let mut gpu = Instance::new().unwrap();
+    /// let mut f = gpu.begin_new_frame();
+    /// let p: shader::Program = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+    /// f.bind_program(&p); // fail, p doesn't live long enough
+    /// ```
     pub fn bind_program(&mut self, program: &'g shader::Program) {
         // Safety: The lifetime guarantees that it must live long enough and also pins it for the duration
         unsafe {
