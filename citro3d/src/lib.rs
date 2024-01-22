@@ -141,22 +141,6 @@ impl Instance {
         unsafe { citro3d_sys::C3D_SetAttrInfo(raw.cast_mut()) };
     }
 
-    /// Render primitives from the current vertex array buffer.
-    #[doc(alias = "C3D_DrawArrays")]
-    pub fn draw_arrays(&mut self, primitive: buffer::Primitive, vbo_data: buffer::Slice) {
-        self.set_buffer_info(vbo_data.info());
-
-        // TODO: should we also require the attrib info directly here?
-
-        unsafe {
-            citro3d_sys::C3D_DrawArrays(
-                primitive as ctru_sys::GPU_Primitive_t,
-                vbo_data.index(),
-                vbo_data.len(),
-            );
-        }
-    }
-
     /// Use the given [`shader::Program`] for subsequent draw calls.
     ///
     /// # Safety
@@ -264,11 +248,46 @@ impl<'g> Frame<'g> {
             self.0.bind_program(program);
         }
     }
+    pub fn drawer<'s>(&'s mut self) -> Drawer<'g, 's> {
+        Drawer { frame: self }
+    }
 }
 impl<'g> Drop for Frame<'g> {
     fn drop(&mut self) {
         unsafe {
             citro3d_sys::C3D_FrameEnd(0);
+        }
+    }
+}
+
+pub struct Drawer<'g: 'f, 'f> {
+    frame: &'f mut Frame<'g>,
+}
+
+impl<'g: 'f, 'f> Drawer<'g, 'f> {
+    /// Render primitives from the current vertex array buffer.
+    ///
+    /// ```compile_fail
+    /// let mut gpu = Instance::new().unwrap();
+    /// let mut f = gpu.begin_new_frame();
+    /// let mut buf = buffer::Info::new();
+    /// let att = attrib::Info::new();
+    /// let v = [5];
+    /// let vbo = buf.add(&v, &att).unwrap();
+    /// f.drawer().draw_arrays(buffer::Primitive::Triangles, vbo); // v doesn't live long enough
+    /// ```
+    #[doc(alias = "C3D_DrawArrays")]
+    pub fn draw_arrays(&mut self, primitive: buffer::Primitive, vbo_data: buffer::Slice<'g, '_>) {
+        self.frame.0.set_buffer_info(vbo_data.info());
+
+        // TODO: should we also require the attrib info directly here?
+
+        unsafe {
+            citro3d_sys::C3D_DrawArrays(
+                primitive as ctru_sys::GPU_Primitive_t,
+                vbo_data.index(),
+                vbo_data.len(),
+            );
         }
     }
 }

@@ -3,7 +3,7 @@
 //! See the [`attrib`] module for details on how to describe the shape and type
 //! of the VBO data.
 
-use std::mem::MaybeUninit;
+use std::{marker::PhantomData, mem::MaybeUninit};
 
 use crate::attrib;
 
@@ -16,16 +16,17 @@ pub struct Info(pub(crate) citro3d_sys::C3D_BufInfo);
 /// A slice of buffer data. This borrows the buffer data and can be thought of
 /// as similar to `&[T]` obtained by slicing a `Vec<T>`.
 #[derive(Debug, Clone, Copy)]
-pub struct Slice<'buf> {
+pub struct Slice<'vbo, 'buf> {
     index: libc::c_int,
     size: libc::c_int,
     buf_info: &'buf Info,
+    _vbo: PhantomData<&'vbo ()>,
     // TODO: should we encapsulate the primitive here too, and require it when the
     // slice is registered? Could there ever be a use case to draw different primitives
     // using the same backing data???
 }
 
-impl Slice<'_> {
+impl Slice<'_, '_> {
     /// Get the index into the buffer for this slice.
     pub fn index(&self) -> libc::c_int {
         self.index
@@ -104,15 +105,11 @@ impl Info {
     /// * if `vbo_data` is not allocated with the [`ctru::linear`] allocator
     /// * if the maximum number (12) of VBOs are already registered
     #[doc(alias = "BufInfo_Add")]
-    pub fn add<'this, 'vbo, 'idx, T>(
+    pub fn add<'this, 'vbo, T>(
         &'this mut self,
         vbo_data: &'vbo [T],
         attrib_info: &attrib::Info,
-    ) -> crate::Result<Slice<'idx>>
-    where
-        'this: 'idx,
-        'vbo: 'idx,
-    {
+    ) -> crate::Result<Slice<'vbo, 'this>> {
         let stride = std::mem::size_of::<T>().try_into()?;
 
         // SAFETY: the lifetime of the VBO data is encapsulated in the return value's
@@ -137,6 +134,7 @@ impl Info {
                 index: res,
                 size: vbo_data.len().try_into()?,
                 buf_info: self,
+                _vbo: PhantomData,
             }),
         }
     }
